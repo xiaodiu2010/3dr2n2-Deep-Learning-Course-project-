@@ -18,8 +18,8 @@ is to improve the performance of 3d reconstructionddd.\\
 We used ShapeNet models to generate rendered images and voxelized models which are available below:
 To download, use wget ftp://cs.stanford.edu/cs/cvgl/ShapeNetRendering.tgz.
 
-* [ShapeNet rendered images ](ftp://cs.stanford.edu/cs/cvgl/ShapeNetRendering.tgz)
-* [ShapeNet voxelized models ](ftp://cs.stanford.edu/cs/cvgl/ShapeNetVox32.tgz)
+* ShapeNet rendered images ftp://cs.stanford.edu/cs/cvgl/ShapeNetRendering.tgz
+* ShapeNet voxelized models ftp://cs.stanford.edu/cs/cvgl/ShapeNetVox32.tgz
 
 
 ## Training the network
