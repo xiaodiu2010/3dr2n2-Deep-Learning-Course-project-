@@ -14,7 +14,7 @@ from data_loader import util
 slim = tf.contrib.slim
 
 tf.app.flags.DEFINE_string(
-    'config_path', '../configs/example.json',
+    'config_path', '../configs/ae.json',
     'configuration file path.')
 
 
@@ -50,7 +50,7 @@ def main(_):
             data = generator(config.input)
             x_train, y_train = data.get_train_data()
             x_train = tf.expand_dims(x_train, -1)
-            x_train.set_shape([None, config.input.seq_len, config.input.img_out_shape[0],
+            x_train.set_shape([None,  config.input.img_out_shape[0],
                                config.input.img_out_shape[1],config.input.img_out_shape[2]])
             y_train.set_shape([None, config.input.mask_out_shape[0],
                                config.input.mask_out_shape[1], config.input.mask_out_shape[2]])
@@ -66,10 +66,11 @@ def main(_):
             x_train, y_train = batch_queue
             print(x_train)
             print(y_train)
-            f_score, end_points = net.net(x_train)
+            y_input = tf.expand_dims(tf.cast(y_train, tf.float32),-1)
+            f_score, end_points, fc_fake, fc_true = net.net(x_train, y_input)
             # Add loss function.
-            net.loss(f_score, y_train)
-            return f_score, end_points, x_train, y_train
+            loss_G, loss_D = net.loss(f_score, y_train, fc_fake, fc_true)
+            return f_score, end_points, x_train, y_train, loss_G, loss_D
 
         summaries = set(tf.get_collection(tf.GraphKeys.SUMMARIES))
 
@@ -81,7 +82,7 @@ def main(_):
         for loss in tf.get_collection('EXTRA_LOSSES', first_clone_scope):
             summaries.add(tf.summary.scalar(loss.op.name, loss))
 
-        f_score, _, x_train, y_train = clones[0].outputs
+        f_score, _, x_train, y_train, loss_G, loss_D= clones[0].outputs
         #print(x_train)
         y_train_hot = tf.one_hot(y_train, depth=config.network.num_classes, axis=-1)
         ## add precision and recall
@@ -118,31 +119,10 @@ def main(_):
         if config.train.moving_average_decay:
             update_ops.append(variable_averages.apply(moving_average_variables))
 
-        # Variables to train.
-        variables_to_train = tf_utils.get_variables_to_train(config.finetune)
 
-        #  and returns a train_tensor and summary_op
-        total_loss, clones_gradients = deploy.optimize_clones(
-            clones,
-            optimizer,
-            var_list=variables_to_train)
+        op_g = optimizer.minimize(loss_G)
+        op_d = optimizer.minimize(loss_D)
 
-        if config.train.clip_gradient_norm > 0:
-            with ops.name_scope('clip_grads'):
-                clones_gradients = slim.learning.clip_gradient_norms(clones_gradients,
-                                                                     config.train.clip_gradient_norm)
-        # Create gradient updates.
-        grad_updates = optimizer.apply_gradients(clones_gradients,
-                                                 global_step=global_step)
-        update_ops.append(grad_updates)
-
-        update_op = tf.group(*update_ops)
-        train_tensor = control_flow_ops.with_dependencies([update_op], total_loss,
-                                                          name='train_op')
-
-        # train_tensor = slim.learning.create_train_op(total_loss, optimizer, gradient_multipliers=gradient_multipliers)
-        summaries.add(tf.summary.scalar('learning_rate', learning_rate))
-        summaries.add(tf.summary.scalar('total_loss', total_loss))
         summaries |= set(tf.get_collection(tf.GraphKeys.SUMMARIES,
                                            first_clone_scope))
 
@@ -203,14 +183,10 @@ def main(_):
                 log_step_count_steps=config.summary.log_every_n_steps) as sess:
             while not sess.should_stop():
 
-                _, loss, g_step = sess.run([train_tensor, total_loss, global_step])
-                print("{} step loss is {}".format(g_step, loss))
-                if(g_step % 100 ==0):
-                    _, loss, g_step, f_score_, x_train_, y_train_ = \
-                                        sess.run([train_tensor, total_loss, global_step,
-                                                  f_score, x_train, y_train])
-                    util.save_result(config.summary.train_dir, x_train_, y_train_, f_score_)
-                    print('Images Saved')
+                _, loss_g, g_step = sess.run([op_g, loss_G, global_step])
+                _, loss_d = sess.run([op_d, loss_D])
+                print("{} step loss_g is {}, loss_d is {}".format(g_step, loss_g, loss_d))
+
 
 
 if __name__ == '__main__':

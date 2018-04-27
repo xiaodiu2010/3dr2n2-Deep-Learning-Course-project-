@@ -4,7 +4,7 @@ sys.path.append('../')
 import tensorflow as tf
 import datetime
 from utils.config import process_config
-from data_loader.data_generator import DataGenerator
+from data_loader.data_generator_lstm import DataGenerator
 
 slim = tf.contrib.slim
 

@@ -8,7 +8,7 @@ import cv2
 import tensorflow as tf
 from tensorflow.python.training import saver as tf_saver
 from tensorflow.python.platform import tf_logging as logging
-from data_loader.data_generator import DataGenerator
+from data_loader.data_generator_lstm import DataGenerator
 from models import tdr2n2
 from utils.config import process_config
 from utils import deploy

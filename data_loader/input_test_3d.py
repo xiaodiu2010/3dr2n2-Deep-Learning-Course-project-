@@ -10,7 +10,7 @@ import numpy as np
 from data_loader.util import save_result
 from mpl_toolkits.mplot3d import Axes3D
 
-config = '../configs/test.json'
+config = '../configs/svrecon.json'
 
 config = process_config(config)
 print(config)
@@ -19,11 +19,11 @@ print(config)
 dataset = get_generator_fn(config)(config.input)
 
 x_train, y_train = dataset.get_train_data()
-x_train.set_shape([None, config.input.seq_len, config.input.img_out_shape[0], config.input.img_out_shape[1], config.input.img_out_shape[2]])
+x_train.set_shape([None, config.input.img_out_shape[0], config.input.img_out_shape[1], config.input.img_out_shape[2]])
 y_train.set_shape([None, config.input.mask_out_shape[0], config.input.mask_out_shape[1], config.input.mask_out_shape[2]])
 
 x_test, y_test = dataset.get_eval_data()
-x_test.set_shape([None, config.input.seq_len, config.input.img_out_shape[0], config.input.img_out_shape[1], config.input.img_out_shape[2]])
+x_test.set_shape([None, config.input.img_out_shape[0], config.input.img_out_shape[1], config.input.img_out_shape[2]])
 y_test.set_shape([None, config.input.mask_out_shape[0], config.input.mask_out_shape[1], config.input.mask_out_shape[2]])
 
 #print(x_train)
@@ -64,15 +64,15 @@ while not sess.should_stop():
     step += 1
 
     print("max:{} min:{}".format(x.max(), x.min()))
-    print(x[0][0].shape)
+    print(x.shape)
     print(np.unique(y))
-    num = config.input.seq_len
+    num = 4
     if visual:
         # Visualization
         if step % 10 == 0:
             fig= plt.figure(figsize=(num*4, 16))
             for i in range(num):
-                img, mask, t_img, t_mask = x[0][i], y[0], x_t[0][i], y_t[0]
+                img, mask, t_img, t_mask = x[i], y[i], x_t[i], y_t[i]
                 fig.add_subplot(num, 4, 4*i+1)
                 plt.imshow(img.astype(np.uint8))
                 axs = fig.add_subplot(num, 4, 4*i+2, projection='3d')
@@ -85,8 +85,4 @@ while not sess.should_stop():
                 axs.scatter(xs, ys, zs, c='blue')
             plt.show()
 
-        save_result('../data/', x, y, y)
-
-
-
-
+        #save_result('../data/', x, y, y)

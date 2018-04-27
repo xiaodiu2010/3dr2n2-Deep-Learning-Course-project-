@@ -1,6 +1,7 @@
 {
   "network":
-            { "model_name": "u_net",
+            { "model_name": "auto_encoder",
+               "generator": "generator_lstm",
               "num_classes":2,
               "network_name":"resnet_v1_50",
               "labels_offset":0,
@@ -9,15 +10,15 @@
   "input":
           {"train_file_path": "../data/ShapeNetRendering/",
           "train_label_path":"../data/ShapeNetVox32/",
-            "eval_file_path":"",
-          "eval_label_path":"",
+            "eval_file_path":"../data/ShapeNetRendering/",
+          "eval_label_path":"../data/ShapeNetVox32/",
           "buffer":500,
             "seq_len": 7,
           "img_out_shape":[137, 137, 3],
             "mask_out_shape":[32, 32, 32],
           "data_parallel_threads":8,
-          "batch_size": 32,
-            "batch_size_test": 32,
+          "batch_size": 16,
+            "batch_size_test": 16,
           "is_train":true,
             "data_format":"NDHWC",
             "num_samples": 128942
@@ -40,11 +41,11 @@
           "clip_gradient_norm":0
           },
   "summary":
-          {"train_dir":"../logs/3dr2n2_resnet_v1",
-            "test_dir":"../logs/3dr2n2_resnet_v1_test",
+          {"train_dir":"../logs/3dr2n2_04_10",
+            "test_dir":"../logs/3dr2n2_test",
             "log_every_n_steps":10,
             "save_summaries_secs":300,
-            "save_checkpoint_secs":300
+            "save_checkpoint_secs":1200
           },
   "deploy":
           {"num_clone":1,
@@ -52,7 +53,7 @@
           },
   "finetune":
           {"checkpoint_path":null,
-            "eval_checkpoint_dir":"../logs/3dr2n2_resnet_v1",
+            "eval_checkpoint_dir":"../logs/3dr2n2_04_10",
           "checkpoint_model_scope": null,
           "checkpoint_exclude_scopes":null,
           "trainable_scopes":null,

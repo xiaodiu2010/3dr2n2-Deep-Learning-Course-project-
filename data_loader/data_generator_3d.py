@@ -3,12 +3,13 @@ sys.path.append('./')
 sys.path.append(os.path.dirname(__file__))
 print(sys.path)
 import tensorflow as tf
-from .augmentor import augmentation
+from .augmentor_3d import augmentation
 from .util import *
 import pickle
 from . import util
+import random
 
-class DataGenerator(object):
+class DataGenerator_3d(object):
     def __init__(self, config):
         """
         config:
@@ -18,12 +19,14 @@ class DataGenerator(object):
         """
         self.suffix = '.png'
         self.config = config
-        #self.train_filenames = get_files(config.train_file_path, seq_len=self.config.seq_len, suffix=self.suffix)
+        #self.files_list = get_files_3d(config.train_file_path)
         with open("../data/files.txt", "rb") as fp:
-            self.train_filenames = pickle.load(fp)
-        self.train_labels = get_labels(config.train_label_path, self.train_filenames)
-        self.eval_filenames = get_files(config.eval_file_path, seq_len=self.config.seq_len, suffix=self.suffix)
-        self.eval_labels = get_labels(config.eval_label_path, self.eval_filenames)
+            self.files_list = pickle.load(fp)
+        self.train_filenames = self.files_list[:int(0.95*len(self.files_list))]
+        random.shuffle(self.train_filenames)
+        self.train_labels = get_labels_3d(config.train_label_path, self.train_filenames)
+        self.eval_filenames = self.files_list[int(0.95*len(self.files_list)):]
+        self.eval_labels = get_labels_3d(config.eval_label_path, self.eval_filenames)
         self.dataset = None
         self.test_dateset = None
         self.print_info()
@@ -32,7 +35,7 @@ class DataGenerator(object):
         self.iterator_test = None
 
     def print_info(self):
-        print("The dataset has {} examples".format(len(self.train_filenames)))
+        print("The dataset has {} examples".format(len(self.files_list)))
         print("Their are {} images, and {} masks".format(len(self.train_filenames), len(self.train_labels)))
         print("Their are {} images, and {} masks in test set".format(len(self.eval_filenames), len(self.eval_labels)))
 
@@ -48,7 +51,7 @@ class DataGenerator(object):
 
         dataset_train = dataset_train.prefetch(self.config.batch_size)
         dataset_train = dataset_train.shuffle(self.config.buffer)
-        dataset_train = dataset_train.repeat(50)
+        dataset_train = dataset_train.repeat(1000)
         dataset_train = dataset_train.map(
                         lambda filename, label: tuple(tf.py_func(
                             augmentation(self.config), [filename, label], [tf.float32, tf.uint8])),
@@ -88,7 +91,7 @@ class DataGenerator(object):
 
 
     def load_data(self, filename, label):
-        image, mask = util._read_py_function(filename, label)
+        image, mask = util._read_py_function_3d(filename, label)
         return image, mask
 
 

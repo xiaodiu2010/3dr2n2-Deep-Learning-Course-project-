@@ -14,7 +14,7 @@ from data_loader import util
 slim = tf.contrib.slim
 
 tf.app.flags.DEFINE_string(
-    'config_path', '../configs/example.json',
+    'config_path', '../configs/ae.json',
     'configuration file path.')
 
 
@@ -50,7 +50,7 @@ def main(_):
             data = generator(config.input)
             x_train, y_train = data.get_train_data()
             x_train = tf.expand_dims(x_train, -1)
-            x_train.set_shape([None, config.input.seq_len, config.input.img_out_shape[0],
+            x_train.set_shape([None,  config.input.img_out_shape[0],
                                config.input.img_out_shape[1],config.input.img_out_shape[2]])
             y_train.set_shape([None, config.input.mask_out_shape[0],
                                config.input.mask_out_shape[1], config.input.mask_out_shape[2]])
@@ -66,7 +66,8 @@ def main(_):
             x_train, y_train = batch_queue
             print(x_train)
             print(y_train)
-            f_score, end_points = net.net(x_train)
+            y_input = tf.expand_dims(tf.cast(y_train, tf.float32),-1)
+            f_score, end_points = net.net(y_input)
             # Add loss function.
             net.loss(f_score, y_train)
             return f_score, end_points, x_train, y_train
@@ -205,12 +206,7 @@ def main(_):
 
                 _, loss, g_step = sess.run([train_tensor, total_loss, global_step])
                 print("{} step loss is {}".format(g_step, loss))
-                if(g_step % 100 ==0):
-                    _, loss, g_step, f_score_, x_train_, y_train_ = \
-                                        sess.run([train_tensor, total_loss, global_step,
-                                                  f_score, x_train, y_train])
-                    util.save_result(config.summary.train_dir, x_train_, y_train_, f_score_)
-                    print('Images Saved')
+
 
 
 if __name__ == '__main__':

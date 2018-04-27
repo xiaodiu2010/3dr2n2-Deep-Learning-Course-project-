@@ -10,10 +10,9 @@ slim = tf.contrib.slim
 
 
 
-class TDR2N2(object):
+class autoencoder(object):
     def __init__(self, config):
         self.config = config
-        self.network = nets_factory.get_network_fn(self.config)
         if self.config.train.use_batch:
             self.normalizer_fn = slim.batch_norm
             self.batch_norm_params = {
@@ -35,43 +34,40 @@ class TDR2N2(object):
                                           normalizer_params=self.batch_norm_params)):
         '''
         n_deconvfilter = [128, 128, 128, 64, 32, 2]
-        fc_features = []
-        reuse=False
-        end_points = None
-        for i in range(self.config.input.seq_len):
-            image = images[:, i, :, :, :]
-            dims = images.get_shape().as_list()
-            print(image)
-            image = tf.reshape(image, [-1, dims[2], dims[3], dims[4]])
-            logits, end_points = self.network(image, self.config, reuse=reuse)
-            dims = end_points['global_pool'].get_shape().as_list()
-            fc_feature = tf.squeeze(end_points["global_pool"])
-            fc_feature.set_shape((None, dims[-1]))
-            fc_features.append(fc_feature)
-            if not reuse:
-                end_points = end_points
-                print("global_pool : {}".format(end_points['global_pool']))
-            reuse = True
-        print(fc_features)
-        fc_features = tf.stack(fc_features)
-        print("fc_features: {}".format(fc_features))
-        dims = fc_features.get_shape().as_list()
-        print("dims" + str(dims))
+        end_points = {}
+        ## 3D deconvlution
+        with tf.variable_scope('3dconv', reuse=False):
+            with slim.arg_scope(self.arg_scopes_3dconv()):
+                net = slim.conv3d(images, 16, 3, stride=1, padding='SAME')
+                end_points['conv1'] = net
 
-        with tf.variable_scope('3dlstm', reuse=False):
-            with slim.arg_scope(self.arg_scopes_lstm()):
-                ## 3d LSTM
-                h = [None for i in range(self.config.input.seq_len+1)]
-                h[0] = tf.zeros((self.config.input.batch_size, 4, 4, 4, n_deconvfilter[0]))
-                for i in range(self.config.input.seq_len):
-                    fc_feature = fc_features[i]
-                    h[i+1] = self.tdgru(h[i], fc_feature, n_deconvfilter[0])
+                net = slim.conv3d(net, 32, 3, stride=2, padding='SAME')
+                end_points['conv2'] = net
 
-                print(h[-1])
+                net = slim.conv3d(net, 64, 3, stride=1, padding='SAME')
+                end_points['conv3'] = net
+
+                net = slim.conv3d(net, 128, 3, stride=2, padding='SAME')
+                end_points['conv3'] = net
+
+                net = slim.conv3d(net, 128, 3, stride=1, padding='SAME')
+                end_points['conv4'] = net
+
+                net = slim.conv3d(net, 128, 3, stride=2, padding='SAME')
+                end_points['conv5'] = net
+
+                dims = net.get_shape().as_list()
+                net = slim.flatten(net)
+                net = slim.fully_connected(net, 343)
+                end_points['fc1'] = net
+                print(end_points)
+
         ## 3D deconvlution
         with tf.variable_scope('3ddeconv', reuse=False):
             with slim.arg_scope(self.arg_scopes_3ddeconv()):
-                net = slim.conv3d_transpose(h[-1], n_deconvfilter[1], 3, stride=[2,2,2])
+                net = slim.fully_connected(net, dims[1]*dims[2]*dims[3]*dims[4])
+                net = tf.reshape(net, [-1, dims[1], dims[2], dims[3],dims[4]])
+                net = slim.conv3d_transpose(net, n_deconvfilter[1], 3, stride=[2,2,2])
                 temp = net
                 net = slim.conv3d(net, n_deconvfilter[1], 3)
                 net = slim.conv3d(net, n_deconvfilter[1], 3)
@@ -101,35 +97,21 @@ class TDR2N2(object):
                 net = slim.conv3d(net, n_deconvfilter[4], 3)
                 net = slim.conv3d(net, n_deconvfilter[4], 3, activation_fn=None)
                 f_score = slim.conv3d(net, n_deconvfilter[5], 3, activation_fn=None)
-
+                print(end_points)
         return f_score, end_points
 
 
-    def tdgru(self, h_prev, fc_feature, filters):
-        u_t = tf.sigmoid(self.fcconv3dlayer(h_prev, fc_feature, filters))
-        r_t = tf.sigmoid(self.fcconv3dlayer(h_prev, fc_feature, filters))
-        h_t = tf.multiply((1. - u_t), h_prev) + \
-              tf.multiply(u_t, tf.tanh(self.fcconv3dlayer(tf.multiply(r_t, h_prev), fc_feature, filters)))
-        return h_t
-
-    def fcconv3dlayer(self, h_prev, fc_feature, filters):
-        out_shape = h_prev.get_shape().as_list()
-        fc_output = tf.reshape(slim.fully_connected(fc_feature, 4*4*4*filters), out_shape)
-        h_next = fc_output + slim.conv3d(h_prev, filters, [3,3,3])
-        return h_next
-
-    def arg_scopes_lstm(self):
-        with slim.arg_scope([slim.conv3d, slim.fully_connected],
-                            activation_fn=None,
-                            normalizer_fn=None,
-                            normalizer_params=None,
-                            weights_regularizer=None,
+    def arg_scopes_3dconv(self):
+        with slim.arg_scope([slim.conv3d, slim.conv3d_transpose],
+                            activation_fn=tf.nn.relu,
+                            normalizer_fn=self.normalizer_fn,
+                            normalizer_params=self.batch_norm_params,
+                            weights_regularizer=slim.l2_regularizer(self.config.train.weight_decay),
                             biases_initializer=tf.zeros_initializer()):
             with slim.arg_scope([slim.conv3d],
                                 padding='SAME',
                                 data_format=self.config.input.data_format) as sc:
                 return sc
-
 
     def arg_scopes_3ddeconv(self):
         with slim.arg_scope([slim.conv3d, slim.conv3d_transpose],
